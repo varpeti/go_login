@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Login with HTMX</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://unpkg.com/htmx.org"></script>
+  <script src="https://unpkg.com/htmx-ext-ws"></script>
+</head>
+<body>
+  <div id="ws" hx-ext="ws" ws-connect="/ws">
+
+    <div id="loginForm">
+      <h2>Login</h2>
+      <form id="login" ws-send>
+        <label for="username">Username:</label><br>
+        <input type="text" id="username" name="username"><br><br>
+        <label for="password">Password:</label><br>
+        <input type="password" id="password" name="password"><br><br>
+        <button type="submit">Login</button>
+      </form>
+    </div>
+
+  </div>
+</body>
+</html>
