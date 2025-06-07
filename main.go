@@ -1,11 +1,17 @@
 package main
 
 import (
+	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 
-	"github.com/alexedwards/argon2id"
 	"github.com/gorilla/websocket"
+)
+
+type (
+	Req []byte
+	Res []byte
 )
 
 var upgrader = websocket.Upgrader{
@@ -33,49 +39,63 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	defer conn.Close()
 
 	for {
-		// Decode the received base64 username and password
-		var data struct {
-			Username string `json:"username"`
-			Password string `json:"password"`
-		}
-		err = conn.ReadJSON(&data)
+		req_type, req, err := conn.ReadMessage()
 		if err != nil {
-			log.Println("Error decoding JSON:", err)
+			// Connection broken
 			break
 		}
 
-		log.Println("Data:", data)
-
-		// hash, err := argon2id.CreateHash(data.Password, argon2id.DefaultParams)
-		// if err != nil {
-		// 	log.Println("Error CreateHash", err)
-		// }
-		//
-		// log.Println("Hash:", hash)
-		//
-		// err = conn.WriteMessage(websocket.TextMessage, []byte(hash))
-		// if err != nil {
-		// 	log.Println("Error conn.WriteMessage", err)
-		// }
-
-		// password
-		const hash = "$argon2id$v=19$m=65536,t=1,p=12$OARECWZoZ+X7OY5rMHzFWg$9ZUSA8gMIslrdWnTgAdNAHDRZ3rUahlzAsHrM0s2jlk"
-		match, err := argon2id.ComparePasswordAndHash(data.Password, hash)
-		if err != nil {
-			log.Println("Error argon2id.ComparePasswordAndHash", err)
+		var res Res
+		switch req_type {
+		case websocket.BinaryMessage:
+			res, err = handle_binary_message(req)
+		case websocket.TextMessage:
+			res, err = handele_text_message(req)
+		case websocket.CloseMessage:
+			// TODO
+		case websocket.CloseMessageTooBig:
+			// TODO
+		case websocket.PingMessage:
+			conn.WriteMessage(websocket.PongMessage, []byte{})
+		case websocket.PongMessage:
+			conn.WriteMessage(websocket.PingMessage, []byte{})
+		default:
+			err = fmt.Errorf("websocket request type is invalid: %d", req_type)
 		}
 
-		if match {
-			log.Println("Login successful")
-			// Send a confirmation message back to client if needed
-			err = conn.WriteMessage(websocket.TextMessage, []byte("Welcome!"))
-		} else {
-			log.Println("Login failed")
-			err = conn.WriteMessage(websocket.TextMessage, []byte("Invalid credentials"))
-		}
 		if err != nil {
-			log.Println("Error writing message:", err)
-			break
+			log.Println("Error: ", err)
+		}
+
+		if res != nil {
+			conn.WriteMessage(websocket.TextMessage, res)
 		}
 	}
+}
+
+func handele_text_message(message []byte) (Res, error) {
+	var meta struct {
+		Headers struct {
+			MessageType string `json:"HX-Trigger-Name"`
+		} `json:"HEADERS"`
+	}
+	err := json.Unmarshal(message, &meta)
+	if err != nil {
+		err = fmt.Errorf("failed to get MessageType from message: %w", err)
+		return nil, err
+	}
+
+	var res Res
+	switch meta.Headers.MessageType {
+	case "login_with_password":
+		res, err = Login_with_password(message)
+	default:
+		err = fmt.Errorf("invalid MessageType: %s", meta.Headers.MessageType)
+	}
+	return res, err
+}
+
+func handle_binary_message(message []byte) (Res, error) {
+	// TODO
+	return nil, fmt.Errorf("unimplemented")
 }
