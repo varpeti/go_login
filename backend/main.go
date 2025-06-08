@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -33,20 +32,20 @@ func main() {
 		log.Fatal("DB init failed:", err)
 	}
 
-	http.HandleFunc("/ws", handleWebSocket)
+	http.HandleFunc("/ws", handle_web_socket)
 	http.Handle("/", http.FileServer(http.Dir("static")))
 
 	log.Println("Starting server on :8080")
 	err = http.ListenAndServe(":8080", nil)
 	if err != nil {
-		log.Fatal("ListenAndServe: ", err)
+		log.Fatal("Failed to start server", err)
 	}
 }
 
-func handleWebSocket(w http.ResponseWriter, r *http.Request) {
+func handle_web_socket(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Println("Failed to upgrade to WebSocket:", err)
+		log.Println("Failed to upgrade to WebSocket", err)
 		return
 	}
 	defer conn.Close()
@@ -82,7 +81,7 @@ L:
 		case websocket.PongMessage:
 			conn.WriteMessage(websocket.PingMessage, []byte{})
 		default:
-			err = fmt.Errorf("websocket request type is invalid: %d", req_type)
+			err = MyErrorf("websocket request type is invalid: %d", req_type)
 		}
 
 		if err != nil {
@@ -105,13 +104,13 @@ func handele_text_message(req Req) (Res, error) {
 	}
 	err := json.Unmarshal(req.Data, &meta)
 	if err != nil {
-		err = fmt.Errorf("failed to get MessageType from message: %w", err)
+		err = MyErrorf("failed to get MessageType from message: %w", err)
 		return nil, err
 	}
 
 	req.MessageType = strings.Split(meta.Headers.MessageType, "#")
 	if len(req.MessageType) < 1 {
-		err = fmt.Errorf("message_type is invalid (len < 1): %v", req.MessageType)
+		err = MyErrorf("message_type is invalid (len < 1): %v", req.MessageType)
 		return nil, err
 	}
 
@@ -120,12 +119,12 @@ func handele_text_message(req Req) (Res, error) {
 	case "auth":
 		res, err = auth_handler(req)
 	default:
-		err = fmt.Errorf("invalid MessageType: %s", meta.Headers.MessageType)
+		err = MyErrorf("invalid MessageType[0]: %s", req.MessageType[0])
 	}
 	return res, err
 }
 
 func handle_binary_message(req Req) (Res, error) {
 	// TODO
-	return nil, fmt.Errorf("unimplemented")
+	return nil, MyErrorf("unimplemented")
 }

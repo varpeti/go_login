@@ -15,7 +15,7 @@ func InitDb() (*gorm.DB, error) {
 
 	err = godotenv.Load("../.env")
 	if err != nil {
-		err = fmt.Errorf("failed to load .env: %w", err)
+		err = MyErrorf("failed to load .env: %w", err)
 		return nil, err
 	}
 	host := os.Getenv("DB_HOST")
@@ -28,13 +28,13 @@ func InitDb() (*gorm.DB, error) {
 
 	DB, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
-		err = fmt.Errorf("failed to open postgres DB: %w", err)
+		err = MyErrorf("failed to open postgres DB: %w", err)
 		return nil, err
 	}
 
 	err = DB.AutoMigrate(&User{})
 	if err != nil {
-		err = fmt.Errorf("failed to migrate DB: %w", err)
+		err = MyErrorf("failed to migrate DB: %w", err)
 		return nil, err
 	}
 
