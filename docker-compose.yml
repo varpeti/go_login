@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:latest
+    container_name: go_login_pgdb
+    env_file:
+      - .env
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+      PGDATA: /var/lib/postgresql/data
+    ports:
+      - "${DB_PORT}:5432"
+    volumes:
+      - ${DB_DATA}:/var/lib/postgresql/data
+    restart: unless-stopped

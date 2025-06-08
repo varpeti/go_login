@@ -2,7 +2,7 @@ body {
     font-family: Arial, sans-serif;
 }
 
-#loginForm {
+.centerform {
     margin: 50px auto;
     width: 300px;
     padding: 20px;
