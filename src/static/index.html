@@ -10,29 +10,8 @@
 <body>
   <div id="ws" hx-ext="ws" ws-connect="/ws">
 
-    <div class="centerform">
-      <h2>Login</h2>
-      <form name="auth#login_with_password" ws-send>
-        <label for="username">Username:</label><br>
-        <input type="text" name="Email"><br><br>
-        <label for="password">Password:</label><br>
-        <input type="password" name="Password"><br><br>
-        <button type="submit">Login</button><br><br>
-        <div id="status_login"></div>
-      </form>
-    </div>
-
-    <div class="centerform">
-      <h2>Register</h2>
-      <form name="auth#register" ws-send>
-        <label for="username">Username:</label><br>
-        <input type="text" name="Email"><br><br>
-        <label for="password">Password:</label><br>
-        <input type="password" name="Password"><br><br>
-        <button type="submit">Register</button><br><br>
-        <div id="status_register"></div>
-      </form>
-    </div>
+      <button name="auth#login_page" ws-send>Login</button>
+      <button name="auth#register_page" ws-send>Register</button>
 
   </div>
 </body>

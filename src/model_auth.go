@@ -1,7 +1,9 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
+	"go_login/templates"
 
 	"github.com/alexedwards/argon2id"
 	"gorm.io/gorm"
@@ -13,20 +15,39 @@ type User struct {
 	Pw_hash string
 }
 
-func auth_handler(req Req) (Res, error) {
+func Auth_handler(req Req) (Res, error) {
 	var err error
 	var res Res
-	if len(req.MessageType) < 2 {
-		err := MyErrorf("message_type is invalid (len < 2): %v", req.MessageType)
-		return nil, err
+
+	var message_type string
+	message_type, err = NextMessagType(&req)
+	if err != nil {
+		return res, err
 	}
-	switch req.MessageType[1] {
+	switch message_type {
+	case "login_page":
+		res, err = login_page(req)
 	case "login_with_password":
 		res, err = login_with_password(req)
+	// case "register_page":
+	// 	res, err = register_page(req)
 	case "register":
 		res, err = register(req)
 	default:
-		err = MyErrorf("invalid MessageType[1]: %s", req.MessageType[1])
+		err = MyErrorf("invalid MessageType: %s", message_type)
+	}
+
+	return res, err
+}
+
+func login_page(_ Req) (Res, error) {
+	var err error
+	var res Res
+
+	err = templates.Login_page().Render(context.Background(), &res)
+	if err != nil {
+		err = MyErrorf("failed to render template: %w", err)
+		return Res{}, err
 	}
 
 	return res, err
@@ -34,7 +55,8 @@ func auth_handler(req Req) (Res, error) {
 
 func login_with_password(req Req) (Res, error) {
 	var err error
-	res := Res(`<div hx-swap-oob="innerHTML:#status_login">Invalid Email or Password!</div>`)
+	var res Res
+	// res = Res(`<div hx-swap-oob="innerHTML:#status_login">Invalid Email or Password!</div>`)
 
 	var data struct {
 		Email    string
@@ -44,11 +66,11 @@ func login_with_password(req Req) (Res, error) {
 	err = json.Unmarshal(req.Data, &data)
 	if err != nil {
 		err = MyErrorf("failed to parse request: %w", err)
-		return nil, err
+		return Res{}, err
 	}
 
 	var users []User
-	result := req.DB.Where("email = ?", data.Email).Find(&users)
+	result := DB.Where("email = ?", data.Email).Find(&users)
 	if result.Error != nil {
 		err = MyErrorf("db error: failed to get user by email:  %w", result.Error)
 		return res, err
@@ -64,11 +86,11 @@ func login_with_password(req Req) (Res, error) {
 	match, err := argon2id.ComparePasswordAndHash(data.Password, user.Pw_hash)
 	if err != nil {
 		err = MyErrorf("failed to compare password with hash: %w", err)
-		return nil, err
+		return Res{}, err
 	}
 
 	if match {
-		res = Res(`<div hx-swap-oob="innerHTML:#status_login">Logging in...</div>`)
+		// res = Res(`<div hx-swap-oob="innerHTML:#status_login">Logging in...</div>`)
 	}
 	return res, err
 }
@@ -85,13 +107,13 @@ func register(req Req) (Res, error) {
 	err = json.Unmarshal(req.Data, &data)
 	if err != nil {
 		err = MyErrorf("failed to parse request: %w", err)
-		return nil, err
+		return Res{}, err
 	}
 
 	pw_hash, err := argon2id.CreateHash(data.Password, argon2id.DefaultParams)
 	if err != nil {
 		err = MyErrorf("failed to createHash: %w", err)
-		return nil, err
+		return Res{}, err
 	}
 
 	new_user := User{
@@ -99,14 +121,14 @@ func register(req Req) (Res, error) {
 		Pw_hash: pw_hash,
 	}
 
-	result := req.DB.Create(&new_user)
+	result := DB.Create(&new_user)
 	if result.Error != nil {
 		err = MyErrorf("failed to Create user: %w", result.Error)
-		res = Res(`<div hx-swap-oob="innerHTML:#status_register">Invalid Email or Password</div>`)
+		// res = Res(`<div hx-swap-oob="innerHTML:#status_register">Invalid Email or Password</div>`)
 		return res, err
 	}
 
-	res = Res(`<div hx-swap-oob="innerHTML:#status_register">Registered!</div>`)
+	// res = Res(`<div hx-swap-oob="innerHTML:#status_register">Registered!</div>`)
 
 	return res, nil
 }

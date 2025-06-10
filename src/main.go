@@ -1,27 +1,12 @@
 package main
 
 import (
-	"encoding/json"
 	"log"
 	"net/http"
-	"strings"
 
 	"github.com/gorilla/websocket"
 	"gorm.io/gorm"
 )
-
-type Req struct {
-	Data        []byte
-	MessageType []string
-	DB          *gorm.DB
-	// storage
-}
-type Res []byte
-
-var upgrader = websocket.Upgrader{
-	ReadBufferSize:  1024,
-	WriteBufferSize: 1024,
-}
 
 var DB *gorm.DB
 
@@ -62,7 +47,6 @@ L:
 
 		var req Req
 		req.Data = data
-		req.DB = DB
 
 		var res Res
 		switch req_type {
@@ -88,8 +72,8 @@ L:
 			log.Println("Error:", err)
 		}
 
-		if res != nil {
-			conn.WriteMessage(websocket.TextMessage, res)
+		if res.Len() > 0 {
+			conn.WriteMessage(websocket.TextMessage, res.Bytes())
 		}
 	}
 
@@ -97,34 +81,25 @@ L:
 }
 
 func handele_text_message(req Req) (Res, error) {
-	var meta struct {
-		Headers struct {
-			MessageType string `json:"HX-Trigger-Name"`
-		} `json:"HEADERS"`
-	}
-	err := json.Unmarshal(req.Data, &meta)
-	if err != nil {
-		err = MyErrorf("failed to get MessageType from message: %w", err)
-		return nil, err
-	}
-
-	req.MessageType = strings.Split(meta.Headers.MessageType, "#")
-	if len(req.MessageType) < 1 {
-		err = MyErrorf("message_type is invalid (len < 1): %v", req.MessageType)
-		return nil, err
-	}
-
 	var res Res
-	switch req.MessageType[0] {
+	var err error
+
+	var message_type string
+	message_type, err = NextMessagType(&req)
+	if err != nil {
+		return res, err
+	}
+
+	switch message_type {
 	case "auth":
-		res, err = auth_handler(req)
+		res, err = Auth_handler(req)
 	default:
-		err = MyErrorf("invalid MessageType[0]: %s", req.MessageType[0])
+		err = MyErrorf("invalid MessageType: %s", message_type)
 	}
 	return res, err
 }
 
 func handle_binary_message(req Req) (Res, error) {
 	// TODO
-	return nil, MyErrorf("unimplemented")
+	return Res{}, MyErrorf("unimplemented")
 }
