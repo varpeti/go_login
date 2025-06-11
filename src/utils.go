@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -9,6 +10,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/CloudyKit/jet/v6"
 	"github.com/gorilla/websocket"
 	"github.com/joho/godotenv"
 	"gorm.io/driver/postgres"
@@ -107,4 +109,43 @@ func NextMessagType(req *Req) (string, error) {
 
 	ret, req.MessageType = req.MessageType[0], req.MessageType[1:]
 	return ret, nil
+}
+
+var views = jet.NewSet(
+	jet.NewOSFileSystemLoader("./views"),
+	jet.DevelopmentMode(true), // remove or set false in production
+)
+
+func Jet(template_name string, variables jet.VarMap) Res {
+	view, err := views.GetTemplate(template_name)
+	if err != nil {
+		Println("Unexpected error when loading `", template_name, "`:", err)
+		return nil
+	}
+
+	var buf bytes.Buffer
+	err = view.Execute(&buf, variables, nil)
+	if err != nil {
+		Println("Unexpected error when rendering `", template_name, "`:", err)
+		return nil
+	}
+
+	return buf.Bytes()
+}
+
+func Jeti(template_name string, template string, variables jet.VarMap) Res {
+	view, err := views.Parse(template_name, template)
+	if err != nil {
+		Println("Unexpected error when parsing `", template_name, "`:", err)
+		return nil
+	}
+
+	var buf bytes.Buffer
+	err = view.Execute(&buf, variables, nil)
+	if err != nil {
+		Println("Unexpected error when rendering `", template_name, "`:", err)
+		return nil
+	}
+
+	return buf.Bytes()
 }

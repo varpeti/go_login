@@ -62,7 +62,7 @@ L:
 		case websocket.PongMessage:
 			conn.WriteMessage(websocket.PingMessage, []byte{})
 		default:
-			Println("websocket request type is invalid: %d", req_type)
+			Println("websocket request type is invalid:", req_type)
 		}
 
 		if len(res) > 0 {
