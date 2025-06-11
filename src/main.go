@@ -12,10 +12,7 @@ var DB *gorm.DB
 
 func main() {
 	var err error
-	DB, err = InitDb()
-	if err != nil {
-		log.Fatal("DB init failed:", err)
-	}
+	DB = InitDb()
 
 	http.HandleFunc("/ws", handle_web_socket)
 	http.Handle("/", http.FileServer(http.Dir("static")))
@@ -51,55 +48,53 @@ L:
 		var res Res
 		switch req_type {
 		case websocket.BinaryMessage:
-			res, err = handle_binary_message(req)
+			res = handle_binary_message(req)
 		case websocket.TextMessage:
-			res, err = handele_text_message(req)
+			res = handele_text_message(req)
 		case websocket.CloseMessage:
-			// TODO
+			// TODO:
 			break L
 		case websocket.CloseMessageTooBig:
-			// TODO
+			// TODO:
 			break L
 		case websocket.PingMessage:
 			conn.WriteMessage(websocket.PongMessage, []byte{})
 		case websocket.PongMessage:
 			conn.WriteMessage(websocket.PingMessage, []byte{})
 		default:
-			err = MyErrorf("websocket request type is invalid: %d", req_type)
+			Println("websocket request type is invalid: %d", req_type)
 		}
 
-		if err != nil {
-			log.Println("Error:", err)
-		}
-
-		if res.Len() > 0 {
-			conn.WriteMessage(websocket.TextMessage, res.Bytes())
+		if len(res) > 0 {
+			conn.WriteMessage(websocket.TextMessage, res)
 		}
 	}
 
 	log.Println("User disconnected:", conn.RemoteAddr())
 }
 
-func handele_text_message(req Req) (Res, error) {
+func handele_text_message(req Req) Res {
 	var res Res
 	var err error
 
 	var message_type string
 	message_type, err = NextMessagType(&req)
 	if err != nil {
-		return res, err
+		Println(err)
+		return Res{}
 	}
 
 	switch message_type {
 	case "auth":
-		res, err = Auth_handler(req)
+		res = Auth_handler(req)
 	default:
-		err = MyErrorf("invalid MessageType: %s", message_type)
+		Println("invalid MessageType:", message_type)
+		return Res{}
 	}
-	return res, err
+	return res
 }
 
-func handle_binary_message(req Req) (Res, error) {
-	// TODO
-	return Res{}, MyErrorf("unimplemented")
+func handle_binary_message(req Req) Res {
+	Println("Uninplemented!")
+	return Res{}
 }

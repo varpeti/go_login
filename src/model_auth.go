@@ -1,9 +1,7 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
-	"go_login/templates"
 
 	"github.com/alexedwards/argon2id"
 	"gorm.io/gorm"
@@ -15,105 +13,121 @@ type User struct {
 	Pw_hash string
 }
 
-func Auth_handler(req Req) (Res, error) {
-	var err error
-	var res Res
-
-	var message_type string
-	message_type, err = NextMessagType(&req)
+func Auth_handler(req Req) Res {
+	message_type, err := NextMessagType(&req)
 	if err != nil {
-		return res, err
+		Println(err)
+		return nil
 	}
+
+	var res Res
 	switch message_type {
 	case "login_page":
-		res, err = login_page(req)
+		res = login_page(req)
 	case "login_with_password":
-		res, err = login_with_password(req)
-	// case "register_page":
-	// 	res, err = register_page(req)
+		res = login_with_password(req)
+	case "register_page":
+		res = register_page(req)
 	case "register":
-		res, err = register(req)
+		res = register(req)
 	default:
-		err = MyErrorf("invalid MessageType: %s", message_type)
+		Println("invalid MessageType:", message_type)
+		return nil
 	}
-
-	return res, err
+	return res
 }
 
-func login_page(_ Req) (Res, error) {
-	var err error
-	var res Res
-
-	err = templates.Login_page().Render(context.Background(), &res)
-	if err != nil {
-		err = MyErrorf("failed to render template: %w", err)
-		return Res{}, err
-	}
-
-	return res, err
+func login_page(_ Req) Res {
+	res := Res(`
+<div hx-swap-oob="innerHTML:#ws">
+	<div class="centerform">
+		<h2>Login</h2>
+		<form name="auth#login_with_password" ws-send>
+			<label for="username">Username:</label><br>
+			<input type="text" name="Email"><br><br>
+			<label for="password">Password:</label><br>
+			<input type="password" name="Password"><br><br>
+			<button type="submit">Login</button><br><br>
+			<div id="status_login"></div>
+		</form>
+	</div>
+</div>`)
+	return res
 }
 
-func login_with_password(req Req) (Res, error) {
-	var err error
-	var res Res
-	// res = Res(`<div hx-swap-oob="innerHTML:#status_login">Invalid Email or Password!</div>`)
-
+func login_with_password(req Req) Res {
 	var data struct {
 		Email    string
 		Password string
 	}
 
-	err = json.Unmarshal(req.Data, &data)
+	err := json.Unmarshal(req.Data, &data)
 	if err != nil {
-		err = MyErrorf("failed to parse request: %w", err)
-		return Res{}, err
+		Println("failed to parse request:", err)
+		return nil
 	}
 
 	var users []User
 	result := DB.Where("email = ?", data.Email).Find(&users)
 	if result.Error != nil {
-		err = MyErrorf("db error: failed to get user by email:  %w", result.Error)
-		return res, err
+		Println("db error: failed to get user by email:", result.Error)
+		return nil
 	}
 
+	invalid_email_or_password := Res(`<div hx-swap-oob="innerHTML:#status_login">Invalid Email or Password!</div>`)
+
 	if len(users) != 1 {
-		err = MyErrorf("user not found")
-		return res, err
+		return invalid_email_or_password
 	}
 
 	user := users[0]
-
 	match, err := argon2id.ComparePasswordAndHash(data.Password, user.Pw_hash)
 	if err != nil {
-		err = MyErrorf("failed to compare password with hash: %w", err)
-		return Res{}, err
+		Println("failed to compare password with hash: %w", err)
+		return nil
 	}
 
-	if match {
-		// res = Res(`<div hx-swap-oob="innerHTML:#status_login">Logging in...</div>`)
+	if !match {
+		return invalid_email_or_password
 	}
-	return res, err
+
+	return Home_page(req)
 }
 
-func register(req Req) (Res, error) {
-	var res Res
-	var err error
+func register_page(_ Req) Res {
+	res := Res(`
+		<div hx-swap-oob="innerHTML:#ws">
+			<div class="centerform">
+				<h2>Register</h2>
+				<form name="auth#register" ws-send>
+					<label for="username">Username:</label><br>
+					<input type="text" name="Email"><br><br>
+					<label for="password">Password:</label><br>
+					<input type="password" name="Password"><br><br>
+					<button type="submit">Register</button><br><br>
+					<div id="status_register"></div>
+				</form>
+			</div>
+		</div>`)
+	return res
+}
 
+func register(req Req) Res {
 	var data struct {
 		Email    string
 		Password string
 	}
 
-	err = json.Unmarshal(req.Data, &data)
+	err := json.Unmarshal(req.Data, &data)
 	if err != nil {
-		err = MyErrorf("failed to parse request: %w", err)
-		return Res{}, err
+		Println("failed to parse request: %w", err)
+		return nil
 	}
 
 	pw_hash, err := argon2id.CreateHash(data.Password, argon2id.DefaultParams)
 	if err != nil {
-		err = MyErrorf("failed to createHash: %w", err)
-		return Res{}, err
+		Println("failed to createHash: %w", err)
+		return nil
 	}
 
 	new_user := User{
@@ -123,12 +137,9 @@ func register(req Req) (Res, error) {
 
 	result := DB.Create(&new_user)
 	if result.Error != nil {
-		err = MyErrorf("failed to Create user: %w", result.Error)
-		// res = Res(`<div hx-swap-oob="innerHTML:#status_register">Invalid Email or Password</div>`)
-		return res, err
+		res := Res(`<div hx-swap-oob="innerHTML:#status_register">User already exists</div>`)
+		return res
 	}
 
-	// res = Res(`<div hx-swap-oob="innerHTML:#status_register">Registered!</div>`)
-
-	return res, nil
+	return login_page(req)
 }

@@ -1,9 +1,9 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -21,28 +21,35 @@ const (
 	def     = escape + "0m"
 )
 
-func MyErrorf(format string, a ...any) error {
+func Println(a ...any) {
 	pc, file, _, ok := runtime.Caller(1)
-	if !ok {
-		return fmt.Errorf(format, a...)
-	}
 	funcName := runtime.FuncForPC(pc).Name()
 	fileName := filepath.Base(file)
-	prefix := fmt.Sprintf("%s%s%s#%s%s%s", magenta, fileName, def, magenta, funcName, def)
-
-	a = append([]any{prefix}, a...)
-
-	return fmt.Errorf("%s "+format, a...)
+	if ok {
+		prefix := fmt.Sprintf("%s%s%s#%s%s%s", magenta, fileName, def, magenta, funcName, def)
+		a = append([]any{prefix}, a...)
+	}
+	log.Println(a...)
 }
 
-func InitDb() (*gorm.DB, error) {
+func Fatal(a ...any) {
+	pc, file, _, ok := runtime.Caller(1)
+	funcName := runtime.FuncForPC(pc).Name()
+	fileName := filepath.Base(file)
+	if ok {
+		prefix := fmt.Sprintf("%s%s%s#%s%s%s", magenta, fileName, def, magenta, funcName, def)
+		a = append([]any{prefix}, a...)
+	}
+	log.Fatal(a...)
+}
+
+func InitDb() *gorm.DB {
 	var DB *gorm.DB
 	var err error
 
 	err = godotenv.Load("../.env")
 	if err != nil {
-		err = MyErrorf("failed to load .env: %w", err)
-		return nil, err
+		Fatal("failed to load .env:", err)
 	}
 	host := os.Getenv("DB_HOST")
 	port := os.Getenv("DB_PORT")
@@ -54,26 +61,22 @@ func InitDb() (*gorm.DB, error) {
 
 	DB, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
-		err = MyErrorf("failed to open postgres DB: %w", err)
-		return nil, err
+		Fatal("failed to open postgres DB:", err)
 	}
 
 	err = DB.AutoMigrate(&User{})
 	if err != nil {
-		err = MyErrorf("failed to migrate DB: %w", err)
-		return nil, err
+		Fatal("failed to migrate DB:", err)
 	}
 
-	return DB, nil
+	return DB
 }
 
 type Req struct {
 	Data        []byte
 	MessageType []string
 }
-type Res struct {
-	bytes.Buffer
-}
+type Res []byte
 
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
@@ -82,7 +85,6 @@ var upgrader = websocket.Upgrader{
 
 func NextMessagType(req *Req) (string, error) {
 	var ret string
-	var err error
 
 	var meta struct {
 		Headers struct {
@@ -91,21 +93,18 @@ func NextMessagType(req *Req) (string, error) {
 	}
 
 	if req.MessageType == nil {
-		err = json.Unmarshal(req.Data, &meta)
+		err := json.Unmarshal(req.Data, &meta)
 		if err != nil {
-			err = MyErrorf("failed to get MessageType from message: %w", err)
-			return ret, err
+			return "", fmt.Errorf("failed to get MessageType from message: %w", err)
 		}
 
 		req.MessageType = strings.Split(meta.Headers.MessageType, "#")
 	}
 
 	if len(req.MessageType) < 1 {
-		err = MyErrorf("message_type is invalid (len < 1): %v", req.MessageType)
-		return ret, err
+		return "", fmt.Errorf("message_type is invalid (len < 1): %v", req.MessageType)
 	}
 
 	ret, req.MessageType = req.MessageType[0], req.MessageType[1:]
-
-	return ret, err
+	return ret, nil
 }
